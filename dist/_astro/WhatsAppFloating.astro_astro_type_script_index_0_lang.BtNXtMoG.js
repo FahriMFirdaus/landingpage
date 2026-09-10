@@ -1,0 +1,9 @@
+import{c as a}from"./api.bbBZMZsc.js";const c=document.getElementById("whatsapp-trigger"),n=document.getElementById("whatsapp-menu"),i=document.getElementById("close-whatsapp"),s=document.getElementById("whatsapp-contacts-container"),l=()=>{n?.classList.toggle("active")};c?.addEventListener("click",e=>{e.stopPropagation(),l()});i?.addEventListener("click",e=>{e.stopPropagation(),n?.classList.remove("active")});document.addEventListener("click",e=>{n?.classList.contains("active")&&!n.contains(e.target)&&n.classList.remove("active")});async function d(){try{const e=await a();e&&e.length>0&&s&&(s.innerHTML="",e.forEach((o,r)=>{const t=document.createElement("a");t.href=o.link,t.target="_blank",t.rel="noopener noreferrer",t.className="flex items-center space-x-4 p-4 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 group",t.innerHTML=`
+            <div class="w-12 h-12 bg-[#25D366]/10 text-[#25D366] rounded-xl flex items-center justify-center group-hover:bg-[#25D366] group-hover:text-white transition-all">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-phone w-6 h-6"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </div>
+            <div>
+              <span class="block font-bold text-slate-900">Customer Service ${r+1}</span>
+              <span class="text-sm text-slate-500">${o.number}</span>
+            </div>
+          `,s.appendChild(t)}))}catch(e){console.error("Failed to refresh WhatsApp contacts:",e)}}d();
