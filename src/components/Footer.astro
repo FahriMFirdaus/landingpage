@@ -5,8 +5,10 @@ import { getAppStatus } from '../lib/api';
 const year = new Date().getFullYear();
 const appStatus = await getAppStatus();
 const version = appStatus?.latest_version || '';
-const isMaintenance = appStatus?.maintenance_mode || false;
 const whatsappUrl = appStatus?.contact_whatsapp || '#';
+// Catatan: isMaintenance dari SSG tidak bisa dipercaya sebagai status server yang akurat.
+// Nilai ini hanya fallback — client-side script yang akan mengecek status sesungguhnya.
+const isMaintenance = appStatus?.maintenance_mode || false;
 ---
 
 <footer class="bg-slate-900 text-white pt-20 pb-10">
@@ -57,11 +59,14 @@ const whatsappUrl = appStatus?.contact_whatsapp || '#';
       <!-- App Status -->
       <div>
         <h3 class="text-lg font-bold mb-6">Status Aplikasi</h3>
-        <div class="bg-slate-800 p-4 rounded-xl">
-          <div class="flex items-center space-x-3 mb-2">
-            <div id="server-status-indicator" class={`w-2 h-2 rounded-full ${isMaintenance ? 'bg-yellow-500' : 'bg-green-500 animate-pulse'}`}></div>
-            <span id="server-status-text" class="text-sm font-semibold">Server: {isMaintenance ? 'Maintenance' : 'Online'}</span>
+        <div class="bg-slate-800 p-4 rounded-xl space-y-2">
+          <div class="flex items-center space-x-3">
+            <!-- Indikator: abu-abu = sedang cek, hijau = online, kuning = maintenance, merah = offline -->
+            <div id="server-status-indicator" class="w-2 h-2 rounded-full bg-slate-500"></div>
+            <span id="server-status-text" class="text-sm font-semibold text-slate-300">Memeriksa...</span>
           </div>
+          <!-- Response time: hanya tampil jika server bisa dihubungi -->
+          <p id="server-response-time" class="text-xs text-slate-500 hidden pl-5"></p>
           <p id="footer-version" class={`text-xs text-slate-300 ${!version && 'hidden'}`}>Versi: {version}</p>
         </div>
       </div>

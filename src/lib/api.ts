@@ -234,3 +234,60 @@ export async function getPrivacy() {
     return null;
   }
 }
+
+/**
+ * Cek status server secara NYATA dengan mengukur response time aktual.
+ * Berbeda dari getAppStatus() yang hanya membaca field maintenance_mode,
+ * fungsi ini benar-benar mencoba menghubungi server dan mengukur latensi.
+ *
+ * @returns { status: 'online' | 'maintenance' | 'offline', latencyMs: number | null }
+ */
+export async function checkServerHealth(): Promise<{
+  status: 'online' | 'maintenance' | 'offline';
+  latencyMs: number | null;
+}> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // Timeout 5 detik
+
+  const startTime = performance.now();
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/app-status`, {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache, no-store',
+        'Pragma': 'no-cache',
+      },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    const latencyMs = Math.round(performance.now() - startTime);
+
+    if (!response.ok) {
+      // Server merespons tapi dengan error (5xx, dll)
+      return { status: 'offline', latencyMs };
+    }
+
+    const json = await response.json();
+    const isMaintenance = json?.data?.maintenance_mode === true;
+
+    return {
+      status: isMaintenance ? 'maintenance' : 'online',
+      latencyMs,
+    };
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    const latencyMs = Math.round(performance.now() - startTime);
+
+    if (err?.name === 'AbortError') {
+      // Request di-abort karena timeout 5 detik — server tidak merespons
+      console.warn('[Health Check] Server timeout setelah 5 detik');
+    } else {
+      // Network error — tidak bisa terhubung ke server sama sekali
+      console.warn('[Health Check] Tidak bisa menghubungi server:', err?.message);
+    }
+    return { status: 'offline', latencyMs: null };
+  }
+}

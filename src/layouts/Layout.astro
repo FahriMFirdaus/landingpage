@@ -101,7 +101,53 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://gampangb
 		  tanpa user harus refresh manual.
 		-->
 		<script>
-		  import { getAppStatus, invalidateAppStatusCache } from '../lib/api';
+		  import { getAppStatus, invalidateAppStatusCache, checkServerHealth } from '../lib/api';
+
+		  /** Update indikator status server dengan pengecekan nyata ke server */
+		  async function updateServerStatus() {
+		    const statusIndicator = document.getElementById('server-status-indicator');
+		    const statusText = document.getElementById('server-status-text');
+		    const responseTimeEl = document.getElementById('server-response-time');
+
+		    if (!statusIndicator || !statusText) return;
+
+		    // Tampilkan state "sedang memeriksa" dulu (abu-abu berputar)
+		    statusIndicator.className = 'w-2 h-2 rounded-full bg-slate-400 animate-ping';
+		    statusText.textContent = 'Memeriksa...';
+		    statusText.className = 'text-sm font-semibold text-slate-400';
+
+		    const { status, latencyMs } = await checkServerHealth();
+
+		    // Reset class dulu
+		    statusIndicator.classList.remove('animate-ping', 'bg-slate-400', 'bg-slate-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 'animate-pulse');
+
+		    if (status === 'online') {
+		      statusIndicator.classList.add('bg-green-500', 'animate-pulse');
+		      statusText.textContent = 'Server: Online';
+		      statusText.className = 'text-sm font-semibold text-green-400';
+		      if (responseTimeEl && latencyMs !== null) {
+		        // Warna latensi: hijau < 300ms, kuning 300-800ms, merah > 800ms
+		        const latencyColor = latencyMs < 300 ? 'text-green-500' : latencyMs < 800 ? 'text-yellow-500' : 'text-red-400';
+		        responseTimeEl.innerHTML = `Latensi: <span class="${latencyColor} font-semibold">${latencyMs} ms</span>`;
+		        responseTimeEl.classList.remove('hidden');
+		      }
+		    } else if (status === 'maintenance') {
+		      statusIndicator.classList.add('bg-yellow-500');
+		      statusText.textContent = 'Server: Maintenance';
+		      statusText.className = 'text-sm font-semibold text-yellow-400';
+		      if (responseTimeEl) responseTimeEl.classList.add('hidden');
+		    } else {
+		      // offline
+		      statusIndicator.classList.add('bg-red-500');
+		      statusText.textContent = 'Server: Offline ⚠️';
+		      statusText.className = 'text-sm font-semibold text-red-400';
+		      if (responseTimeEl) {
+		        responseTimeEl.innerHTML = 'Tidak dapat menghubungi server';
+		        responseTimeEl.className = 'text-xs text-red-500 pl-5';
+		        responseTimeEl.classList.remove('hidden');
+		      }
+		    }
+		  }
 
 		  /** Update semua elemen dinamis di halaman dengan data terbaru */
 		  async function syncDynamicData(forceRefresh = false) {
@@ -175,37 +221,27 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://gampangb
 		        if (downloadSizeContainer) downloadSizeContainer.classList.remove('hidden');
 		      }
 
-		      // ── Status Server (maintenance / online) ──────────────────────────
-		      const statusIndicator = document.getElementById('server-status-indicator');
-		      const statusText = document.getElementById('server-status-text');
-		      if (statusIndicator && statusText) {
-		        if (appStatus.maintenance_mode) {
-		          statusIndicator.classList.remove('bg-green-500', 'animate-pulse');
-		          statusIndicator.classList.add('bg-yellow-500');
-		          statusText.textContent = 'Server: Maintenance';
-		        } else {
-		          statusIndicator.classList.remove('bg-yellow-500');
-		          statusIndicator.classList.add('bg-green-500', 'animate-pulse');
-		          statusText.textContent = 'Server: Online';
-		        }
-		      }
-
 		    } catch (err) {
 		      console.warn('[Realtime] Gagal sync data:', err);
 		    }
 		  }
 
-		  // Jalankan segera saat halaman load (force refresh = tidak pakai cache lama)
+		  // Jalankan keduanya segera saat halaman load — paralel, tidak saling tunggu
 		  syncDynamicData(true);
+		  updateServerStatus();
 
 		  // Polling setiap 60 detik → perubahan admin tampil dalam < 1 menit
 		  const POLL_INTERVAL = 60 * 1000;
-		  setInterval(() => syncDynamicData(true), POLL_INTERVAL);
+		  setInterval(() => {
+		    syncDynamicData(true);
+		    updateServerStatus();
+		  }, POLL_INTERVAL);
 
 		  // Update juga saat user kembali ke tab (misal: dari tab lain atau minimize)
 		  document.addEventListener('visibilitychange', () => {
 		    if (document.visibilityState === 'visible') {
 		      syncDynamicData(true);
+		      updateServerStatus();
 		    }
 		  });
 		</script>
