@@ -153,10 +153,39 @@ export async function getWhatsAppContacts() {
        contacts = [data.contact_whatsapp];
     }
     if (contacts.length === 0) return [];
-    return contacts.map(num => ({
-      number: num,
-      link: num.startsWith('http') ? num : `https://wa.me/${num}`
-    }));
+
+    return contacts.map(raw => {
+      // Bersihkan: jika berupa URL wa.me, ambil nomornya saja
+      let number = raw.trim();
+      let link = raw.trim();
+
+      if (number.startsWith('https://wa.me/')) {
+        // Ambil nomor dari URL: https://wa.me/6285314771647 → 6285314771647
+        const extracted = number.replace('https://wa.me/', '').split('?')[0];
+        number = extracted;
+        link = `https://wa.me/${extracted}`;
+      } else if (number.startsWith('http')) {
+        // URL format lain — pakai apa adanya
+        link = number;
+      } else {
+        // Sudah berupa nomor mentah
+        link = `https://wa.me/${number.replace(/[^0-9]/g, '')}`;
+      }
+
+      // Format nomor untuk ditampilkan: 6285314771647 → 0853-1477-1647
+      const digits = number.replace(/[^0-9]/g, '');
+      let displayNumber = digits;
+      if (digits.startsWith('62')) {
+        // Ubah kode negara 62 → 0 untuk tampilan lokal
+        displayNumber = '0' + digits.slice(2);
+      }
+      // Format: 08531477164 → 0853-1477-1647
+      if (displayNumber.startsWith('0') && displayNumber.length >= 10) {
+        displayNumber = displayNumber.replace(/(\d{4})(\d{4})(\d+)/, '$1-$2-$3');
+      }
+
+      return { number: displayNumber, link };
+    });
   } catch (error) {
     return [];
   }

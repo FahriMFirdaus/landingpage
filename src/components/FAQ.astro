@@ -84,9 +84,10 @@ const faqs = [
 
       // Toggle current FAQ
       if (answer) {
-        const isOpening = (answer as HTMLElement).style.maxHeight === '0px' || (answer as HTMLElement).style.maxHeight === '';
-        (answer as HTMLElement).style.maxHeight = isOpening ? '500px' : '0';
-        icon?.classList.toggle('rotate-180', isOpening);
+        const isOpen = (answer as HTMLElement).style.maxHeight !== '' && 
+                       (answer as HTMLElement).style.maxHeight !== '0px';
+        (answer as HTMLElement).style.maxHeight = isOpen ? '0px' : '500px';
+        icon?.classList.toggle('rotate-180', !isOpen);
       }
     });
   });
