@@ -92,5 +92,122 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://gampangb
 	<body class="antialiased text-slate-900">
 		<SplashScreen />
 		<slot />
+
+		<!-- 
+		  REALTIME DATA UPDATER
+		  Script ini berjalan di background dan memperbarui semua data dinamis
+		  (nomor WA, link download, versi, status server) setiap 60 detik.
+		  Ini memastikan perubahan dari dashboard admin langsung tampil di halaman
+		  tanpa user harus refresh manual.
+		-->
+		<script>
+		  import { getAppStatus, invalidateAppStatusCache } from '../lib/api';
+
+		  /** Update semua elemen dinamis di halaman dengan data terbaru */
+		  async function syncDynamicData(forceRefresh = false) {
+		    if (forceRefresh) invalidateAppStatusCache();
+
+		    try {
+		      const appStatus = await getAppStatus();
+		      if (!appStatus) return;
+
+		      // ── Download URL ──────────────────────────────────────────────────
+		      if (appStatus.download_url) {
+		        const downloadIds = [
+		          'hero-download-link',
+		          'bottom-download-link',
+		          'navbar-download-link',
+		          'desktop-download-link',
+		          'mobile-download-link',
+		          'manual-download-link',
+		        ];
+		        downloadIds.forEach(id => {
+		          const el = document.getElementById(id) as HTMLAnchorElement | null;
+		          if (el) el.href = appStatus.download_url;
+		        });
+		      }
+
+		      // ── WhatsApp / CS Link ────────────────────────────────────────────
+		      if (appStatus.contact_whatsapp) {
+		        const waIds = ['hero-whatsapp-link', 'footer-whatsapp-link'];
+		        waIds.forEach(id => {
+		          const el = document.getElementById(id) as HTMLAnchorElement | null;
+		          if (el) el.href = appStatus.contact_whatsapp;
+		        });
+		      }
+
+		      // ── Versi Aplikasi ────────────────────────────────────────────────
+		      if (appStatus.latest_version) {
+		        const versionIds = ['hero-version-text', 'footer-version', 'latest-version'];
+		        const versionBadge = document.getElementById('hero-version-badge');
+
+		        versionIds.forEach(id => {
+		          const el = document.getElementById(id);
+		          if (el) {
+		            if (id === 'footer-version') {
+		              el.textContent = `Versi: ${appStatus.latest_version}`;
+		            } else {
+		              el.textContent = id === 'latest-version'
+		                ? appStatus.latest_version
+		                : `Versi ${appStatus.latest_version}`;
+		            }
+		            el.classList.remove('hidden');
+		          }
+		        });
+		        if (versionBadge) versionBadge.classList.remove('hidden');
+		      }
+
+		      // ── Ukuran File ───────────────────────────────────────────────────
+		      if (appStatus.file_size) {
+		        const sizeText = document.getElementById('hero-filesize-text');
+		        const sizeTooltip = document.getElementById('hero-filesize-tooltip');
+		        const bottomSize = document.getElementById('bottom-filesize-text');
+		        const downloadSize = document.getElementById('file-size');
+		        const downloadSizeContainer = document.getElementById('file-size-container');
+
+		        if (sizeText) sizeText.textContent = appStatus.file_size;
+		        if (sizeTooltip) sizeTooltip.classList.remove('!hidden');
+		        if (bottomSize) {
+		          bottomSize.textContent = `• Ukuran file ${appStatus.file_size}`;
+		          bottomSize.classList.remove('hidden');
+		        }
+		        if (downloadSize) downloadSize.textContent = appStatus.file_size;
+		        if (downloadSizeContainer) downloadSizeContainer.classList.remove('hidden');
+		      }
+
+		      // ── Status Server (maintenance / online) ──────────────────────────
+		      const statusIndicator = document.getElementById('server-status-indicator');
+		      const statusText = document.getElementById('server-status-text');
+		      if (statusIndicator && statusText) {
+		        if (appStatus.maintenance_mode) {
+		          statusIndicator.classList.remove('bg-green-500', 'animate-pulse');
+		          statusIndicator.classList.add('bg-yellow-500');
+		          statusText.textContent = 'Server: Maintenance';
+		        } else {
+		          statusIndicator.classList.remove('bg-yellow-500');
+		          statusIndicator.classList.add('bg-green-500', 'animate-pulse');
+		          statusText.textContent = 'Server: Online';
+		        }
+		      }
+
+		    } catch (err) {
+		      console.warn('[Realtime] Gagal sync data:', err);
+		    }
+		  }
+
+		  // Jalankan segera saat halaman load (force refresh = tidak pakai cache lama)
+		  syncDynamicData(true);
+
+		  // Polling setiap 60 detik → perubahan admin tampil dalam < 1 menit
+		  const POLL_INTERVAL = 60 * 1000;
+		  setInterval(() => syncDynamicData(true), POLL_INTERVAL);
+
+		  // Update juga saat user kembali ke tab (misal: dari tab lain atau minimize)
+		  document.addEventListener('visibilitychange', () => {
+		    if (document.visibilityState === 'visible') {
+		      syncDynamicData(true);
+		    }
+		  });
+		</script>
 	</body>
 </html>

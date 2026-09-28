@@ -7,7 +7,19 @@ if (!rawUrl.endsWith('/api')) {
 export const API_BASE_URL = rawUrl;
 export const BASE_URL = API_BASE_URL.replace(/\/api$/, '');
 
+// Cache dengan TTL — data di browser akan selalu fresh dalam 60 detik.
+// Ini memastikan perubahan dari dashboard admin langsung terlihat tanpa
+// user harus hard-refresh halaman.
+const CACHE_TTL_MS = 60 * 1000; // 60 detik
+
 let appStatusPromise: Promise<any> | null = null;
+let appStatusCachedAt: number = 0;
+
+/** Force-refresh cache. Panggil jika butuh data terbaru segera. */
+export function invalidateAppStatusCache() {
+  appStatusPromise = null;
+  appStatusCachedAt = 0;
+}
 
 export const formatCurrency = (value: number | string | undefined | null) => {
   if (value === undefined || value === null) return '';
@@ -22,13 +34,26 @@ export const formatCurrency = (value: number | string | undefined | null) => {
 };
 
 export async function getAppStatus() {
-  if (typeof window !== 'undefined' && appStatusPromise) {
+  const isClient = typeof window !== 'undefined';
+  const now = Date.now();
+
+  // Di browser: pakai cache hanya jika belum kadaluarsa (< 60 detik)
+  if (isClient && appStatusPromise && (now - appStatusCachedAt) < CACHE_TTL_MS) {
     return appStatusPromise;
   }
 
   const fetchPromise = (async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/app-status`);
+      const response = await fetch(`${API_BASE_URL}/app-status`, {
+        // Paksa browser & CDN selalu ambil data terbaru dari server.
+        // Tanpa header ini, browser/proxy bisa meng-cache response dan
+        // perubahan dari admin tidak akan kelihatan.
+        headers: {
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache',
+        },
+        cache: 'no-store',
+      });
       if (!response.ok) throw new Error('Network response was not ok');
       const json = await response.json();
       const data = json.data;
@@ -104,13 +129,16 @@ export async function getAppStatus() {
       return data;
     } catch (error) {
       console.error('Error fetching app status:', error);
+      // Saat error: hapus cache agar fetch berikutnya bisa mencoba ulang
       appStatusPromise = null;
+      appStatusCachedAt = 0;
       return null;
     }
   })();
 
-  if (typeof window !== 'undefined') {
+  if (isClient) {
     appStatusPromise = fetchPromise;
+    appStatusCachedAt = now;
   }
   return fetchPromise;
 }
